@@ -8,7 +8,10 @@ A bash script to concatenate 2 videos and remove I-frames from the second video 
 - `awk`
 
 ## Install
-Put the script in some directory listed in your `$PATH`.
+Run as root to install globally or as other user to install locally:
+```
+make install
+```
 
 ## Usage
 Output file has to be an mp4.
