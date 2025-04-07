@@ -12,11 +12,11 @@ function help {
 function read_stream_info {
     INPUT="$(ffprobe -count_packets \
         -show_entries stream=nb_read_packets,r_frame_rate,width,height,sample_rate \
-        -v quiet $1 \
-        | awk -F= '$2{print $2}')"
+        -v quiet $1 |
+        awk -F= '$2{print $2}')"
 
     if [[ "$INPUT" == "" ]]; then
-        >&2 echo "Can't read information from file $1" 
+        echo >&2 "Can't read information from file $1"
         return
     fi
     printf "$INPUT"
@@ -26,24 +26,29 @@ function convert_clips {
     TMP1=$(mktemp XXXXXXXXXX.mp4)
     TMP2=$(mktemp XXXXXXXXXX.mp4)
 
-    { read w; read h; read fps; read packets;} <<< $(read_stream_info "$CLIP2")
+    {
+        read w
+        read h
+        read fps
+        read packets
+    } <<<$(read_stream_info "$CLIP2")
     [[ "$w" == "" ]] && cleanup
 
     echo "Converting clips..."
 
-    (( "$WIDTH" % 2 != 0 )) && WIDTH="$(($WIDTH - 1))"
-    (( "$HEIGHT" % 2 != 0 )) && HEIGHT="$(($HEIGHT - 1))"
+    (("$WIDTH" % 2 != 0)) && WIDTH="$(($WIDTH - 1))"
+    (("$HEIGHT" % 2 != 0)) && HEIGHT="$(($HEIGHT - 1))"
 
     ffmpeg -i "$CLIP1" -vf "fps=$FPS,crop=$WIDTH:$HEIGHT:0:0" \
         -pix_fmt yuv420p -y -v quiet "$TMP1"
 
-    nw=$(printf "%.0f" $(echo "$HEIGHT/$h*$w" | bc -l))
-    (( "$nw" % 2 != 0 )) && nw="$(("$nw" + 1))"
+    nw=$(printf "%.0f" $(bc -l <<<"$HEIGHT/$h*$w"))
+    (("$nw" % 2 != 0)) && nw="$(("$nw" + 1))"
 
-    if (( "$nw" < "$WIDTH" )); then
-        nh="$(printf "%.0f" $(echo "$WIDTH/$w*$h" | bc -l))"
+    if (("$nw" < "$WIDTH")); then
+        nh="$(printf "%.0f" $(bc -l <<<"$WIDTH/$w*$h"))"
         nw="$WIDTH"
-        (( "$nw" % 2 != 0 )) && nw=$(("$nw" + 1))
+        (("$nw" % 2 != 0)) && nw=$(("$nw" + 1))
     else
         nh="$HEIGHT"
     fi
@@ -55,12 +60,14 @@ function convert_clips {
 
 function concat_clips {
     LIST=$(mktemp XXXXXXXXXX.txt)
-    echo -e "file $TMP1\nfile $TMP2" > "$LIST"
+    echo -e "file $TMP1\nfile $TMP2" >"$LIST"
 
-    if [[ -f $OUTPUT ]] \
-        && [[ "$(read -e -p \
-            'File '$OUTPUT' already exists, do you want to replace? [y/N]>'
-            echo $REPLY)" != [Yy]* ]]; then
+    if [[ -f $OUTPUT ]] &&
+        [[ "$(
+            read -e -p \
+                'File '$OUTPUT' already exists, do you want to replace? [y/N]>'
+            echo $REPLY
+        )" != [Yy]* ]]; then
         return
     fi
 
@@ -84,9 +91,15 @@ function cleanup {
 [[ ! -f $CLIP1 ]] && echo "File $CLIP1 does not exist" && exit
 [[ ! -f $CLIP2 ]] && echo "File $CLIP2 does not exist" && exit
 
-{ read WIDTH; read HEIGHT; read FPS; read PACKETS; read RATE;} <<< $(read_stream_info "$CLIP1")
+{
+    read WIDTH
+    read HEIGHT
+    read FPS
+    read PACKETS
+    read RATE
+} <<<$(read_stream_info "$CLIP1")
 [[ "$WIDTH" == "" ]] && cleanup
 
-convert_clips 
+convert_clips
 concat_clips
 cleanup
